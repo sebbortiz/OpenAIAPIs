@@ -5,6 +5,7 @@
 //  Created by user234695 on 4/9/23.
 //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
 import SwiftUI
+import UIKit
 
 struct ContentView: View {
     @State private var text = ""
@@ -13,7 +14,7 @@ struct ContentView: View {
     @State private var sentiment: String?
     
     var body: some View {
-        VStack {
+ScrollView {
             Text("OpenAI Demo")
                 .font(.largeTitle)
                 .padding()
@@ -55,7 +56,7 @@ struct ContentView: View {
                     .padding()
             }
             
-            Button(action: getSentiment) {
+            Button(action: fetchSentiment) {
                 Text("Get Sentiment")
                     .foregroundColor(.white)
                     .padding()
@@ -66,18 +67,19 @@ struct ContentView: View {
             
             if let sentiment = sentiment {
                 Text("Sentiment: \(sentiment)")
-                    .padding()
-            }
-            
+                .padding()}
             Spacer()
         }
     }
     
     func generateImage() {
-        ImageGeneration.generateImage(prompt: text) { result in
+        ImageGeneration.generateImage(prompt: text, n:1, size:"1024x1024") { result in
             switch result {
-            case .success(let imageData):
-                if let image = UIImage(data: imageData) {
+            case .success(let data):
+                // Print out the response data received from the API
+                print(String(data: data, encoding: .utf8) ?? "Invalid response data")
+                
+                if let image = UIImage(data: data) {
                     DispatchQueue.main.async {
                         self.image = Image(uiImage: image)
                     }
@@ -90,6 +92,8 @@ struct ContentView: View {
         }
     }
     
+    
+    
     func completeSentence() {
         TextCompletion.completeSentence(prompt: text) { completion in
             DispatchQueue.main.async {
@@ -98,18 +102,27 @@ struct ContentView: View {
         }
     }
     
-    func getSentiment() {
-        let sentimentAnalysis = SentimentsAnalysis()
-        sentimentAnalysis.getSentiment(sentence: self.text) { sentiment in
-            DispatchQueue.main.async {
-                self.sentiment = sentiment ?? "Unable to determine sentiment"
+    func fetchSentiment() {
+        getSentiment(sentence: text) { sentiment, error in
+            if let error = error {
+                print("Error: \(error.localizedDescription)")
+                return
+            }
+
+            if let sentiment = sentiment {
+                DispatchQueue.main.async {
+                    self.sentiment = sentiment
+                }
             }
         }
     }
 
-    struct ContentView_Previews: PreviewProvider {
-        static var previews: some View {
-            ContentView()
-        }
+
+}
+
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
     }
 }
+

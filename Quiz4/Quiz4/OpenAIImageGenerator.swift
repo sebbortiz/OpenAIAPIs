@@ -6,21 +6,15 @@
 //
 
 // OpenAI.swift
-
+import UIKit
 import Foundation
 
 struct ImageGeneration {
-    static let apiKey = "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"
+    static let apiKey = "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"
     
-    static func generateImage(prompt: String, completion: @escaping (Result<Data, Error>) -> Void) {
+    static func generateImage(prompt: String, n: Int, size:String, completion: @escaping (Result<Data, Error>) -> Void) {
         let urlString = "https://api.openai.com/v1/images/generations"
-        let params = [
-            "model": "image-alpha-001",
-            "prompt": prompt,
-            "num_images": 1,
-            "size": "256x256",
-            "response_format": "url"
-        ] as [String : Any]
+        let params = [            "prompt": prompt,            "n": 1,            "size": "1024x1024",            "response_format": "url"        ] as [String : Any]
         
         guard let url = URL(string: urlString) else {
             let error = NSError(domain: "com.example.OpenAI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])
@@ -54,9 +48,25 @@ struct ImageGeneration {
                 return
             }
             
-            completion(.success(data))
+            if let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+               let dataArray = json["data"] as? [[String: Any]],
+               let url = dataArray.first?["url"] as? String,
+               let imageUrl = URL(string: url),
+               let imageData = try? Data(contentsOf: imageUrl) {
+                completion(.success(imageData))
+            } else {
+                let error = NSError(domain: "com.example.OpenAI", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response data"])
+                completion(.failure(error))
+            }
         }
         
         task.resume()
     }
 }
+
+
+
+
+
+
+

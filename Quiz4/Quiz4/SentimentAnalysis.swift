@@ -7,59 +7,50 @@
 
 import Foundation
 
-struct SentimentsAnalysis {
-    func getSentiment(sentence: String) -> String? {
-        let apiKey = "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"
-        let urlString = "https://api.openai.com/v1/classifications"
-        let headers = [
-            "Content-Type": "application/json",
-            "Authorization": "Bearer \(apiKey)"
-        ]
-        let parameters = [
-            "model": "text-davinci-002",
-            "query": sentence,
-            "examples": [
-                ["text": "positive", "label": "Positive"],
-                ["text": "negative", "label": "Negative"],
-                ["text": "neutral", "label": "Neutral"]
-            ],
-            "search_model": "ada",
-            "model_bias": -0.25
-        ] as [String : Any]
-        let jsonData = try? JSONSerialization.data(withJSONObject: parameters)
-        
-        guard let url = URL(string: urlString),
-              let data = jsonData else {
-            return nil
+let apiKey = "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"
+
+func getSentiment(sentence: String, completion: @escaping (String?, Error?) -> Void) {
+    let url = URL(string: "https://api.openai.com/v1/completions")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+    request.addValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+
+    let parameters: [String: Any] = [
+        "model": "text-davinci-002",
+        "prompt": "Determine the sentiment of this text: \"\(sentence)\". Is it positive, negative, or neutral?",
+        "temperature": 0.5,
+        "max_tokens": 10,
+        "n": 1
+    ]
+
+    let postData = try! JSONSerialization.data(withJSONObject: parameters, options: [])
+
+    request.httpBody = postData
+
+    let session = URLSession.shared
+
+    let task = session.dataTask(with: request) { data, response, error in
+        guard let data = data, error == nil else {
+            completion(nil, error)
+            return
         }
-        
-        var sentiment: String?
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.allHTTPHeaderFields = headers
-        request.httpBody = data
-        
-        let semaphore = DispatchSemaphore(value: 0)
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
-            defer { semaphore.signal() }
-            
-            guard error == nil,
-                  let response = response as? HTTPURLResponse,
-                  response.statusCode == 200,
-                  let data = data,
-                  let json = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
-                  let dataJson = json["data"] as? [[String: Any]],
-                  let label = dataJson.first?["label"] as? String else {
-                return
-            }
-            
-            sentiment = label
+
+        let result = try! JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
+
+        if let error = result?["error"] as? String {
+            completion(nil, NSError(domain: "OpenAIError", code: 1, userInfo: [NSLocalizedDescriptionKey: error]))
+            return
         }
-        task.resume()
-        semaphore.wait()
-        
-        return sentiment
+
+        if let choices = result?["choices"] as? [[String: Any]], let sentiment = choices[0]["text"] as? String {
+            completion(sentiment, nil)
+        } else {
+            completion(nil, NSError(domain: "OpenAIError", code: 2, userInfo: [NSLocalizedDescriptionKey: "Could not determine sentiment"]))
+        }
     }
 
+    task.resume()
 }
+
+
